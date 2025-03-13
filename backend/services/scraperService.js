@@ -33,7 +33,11 @@ async function scrapePage(pageUrl) {
     console.log(`Scraping: ${pageUrl}`);
     const response = await axios.get(pageUrl);
     const $ = cheerio.load(response.data);
-
+    
+    // Extract the base domain from the pageUrl for creating absolute URLs
+    const urlObj = new URL(pageUrl);
+    const domain = `${urlObj.protocol}//${urlObj.hostname}`;
+    
     const listings = [];
     let foundSold = false;
 
@@ -62,10 +66,40 @@ async function scrapePage(pageUrl) {
         .text()
         .trim();
 
-      const listingUrl = $(element)
+      // Extract listing URL and convert to absolute URL
+      const relativeListingUrl = $(element)
         .find(".mrp-listing-address-info h3 a")
         .attr("href");
-      const imageUrl = $(element).find(".mrp-listing-main-image").attr("src");
+      const listingUrl = relativeListingUrl ? new URL(relativeListingUrl, domain).toString() : "";
+      
+      // Extract and process image URL
+      const imageElement = $(element).find(".mrp-listing-main-image");
+      let imageUrl = imageElement.attr("src");
+      
+      // If src is a placeholder, try alternative attributes
+      if (!imageUrl || imageUrl.startsWith("data:image")) {
+        imageUrl = imageElement.attr("data-src") || 
+                  imageElement.attr("data-original") || 
+                  imageElement.attr("data-lazy-src") ||
+                  imageElement.attr("data-lazy");
+                
+        // If still no image, try looking for background-image in style
+        if (!imageUrl) {
+          const style = imageElement.attr("style");
+          if (style && style.includes("background-image")) {
+            const match = style.match(/background-image:\s*url\(['"]?(.*?)['"]?\)/i);
+            if (match && match[1]) {
+              imageUrl = match[1];
+            }
+          }
+        }
+      }
+      
+      // Make sure we have an absolute URL for images
+      if (imageUrl && !imageUrl.startsWith("data:image") && !imageUrl.startsWith("http")) {
+        imageUrl = new URL(imageUrl, domain).toString();
+      }
+
       const price = $(element)
         .find(".mrp-listing-price-container")
         .text()
@@ -112,7 +146,6 @@ async function scrapePage(pageUrl) {
     return { listings: [], foundSold: false };
   }
 }
-
 /**
  * Scrape all pages until a SOLD listing is found
  * @returns {Array} - Array of all listing objects
