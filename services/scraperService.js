@@ -14,6 +14,7 @@ const openai = new OpenAI({
 });
 
 const VECTOR_STORE_ID = "vs_67cf8261feb481919be1939c5bdea2ab";
+
 const baseUrl = "https://dorisgee.com/mylistings.html";
 
 async function scrapePage(pageUrl) {
@@ -108,12 +109,15 @@ async function scrapePage(pageUrl) {
 
 async function scrapeAllListings() {
   let currentPage = 1;
+
   let allListings = [];
+
   let foundSold = false;
 
   while (!foundSold) {
     const pageUrl =
       currentPage === 1 ? baseUrl : `${baseUrl}?_pg=${currentPage}`;
+
     const { listings, foundSold: soldOnPage } = await scrapePage(pageUrl);
 
     if (listings.length === 0) {
@@ -124,10 +128,12 @@ async function scrapeAllListings() {
 
     if (soldOnPage) {
       foundSold = true;
+
       console.log("Found SOLD listing. Stopping scrape.");
     }
 
     currentPage++;
+
     await new Promise((resolve) => setTimeout(resolve, 2000));
   }
 
@@ -141,38 +147,46 @@ async function uploadListingsToVectorStore(listings) {
     );
 
     const tempFileName = `listings_${Date.now()}.json`;
+
     const tempFilePath = path.join(process.cwd(), tempFileName);
 
     fs.writeFileSync(tempFilePath, JSON.stringify(listings, null, 2));
+
     console.log(`Created temporary file: ${tempFilePath}`);
 
     const uploadResult = await uploadFileToOpenAI(tempFilePath);
 
     fs.unlinkSync(tempFilePath);
+
     console.log(`Deleted temporary file: ${tempFilePath}`);
 
     return uploadResult;
   } catch (error) {
     console.error("Error uploading listings to vector store:", error);
+
     throw error;
   }
 }
 
 async function uploadFileToOpenAI(filePath) {
   console.log(`Uploading file to OpenAI: ${filePath}`);
+
   try {
     const file = await openai.files.create({
       file: fs.createReadStream(filePath),
+
       purpose: "assistants",
     });
 
     console.log(`File uploaded to OpenAI. File ID: ${file.id}`);
 
     // Delete previous files in the vector store
+
     await deleteExistingFilesFromVectorStore();
 
     const vectorStoreFile = await openai.vectorStores.files.create(
       VECTOR_STORE_ID,
+
       {
         file_id: file.id,
       }
@@ -181,40 +195,31 @@ async function uploadFileToOpenAI(filePath) {
     console.log(
       `File added to vector store. Vector store file ID: ${vectorStoreFile.id}`
     );
+
     return vectorStoreFile;
   } catch (error) {
     console.error("Error uploading file to OpenAI:", error);
+
     throw error;
   }
 }
 
 async function deleteExistingFilesFromVectorStore() {
   try {
-    console.log(
-      `Retrieving existing files in vector store: ${VECTOR_STORE_ID}`
-    );
-
-    const vectorStoreFiles = await openai.vectorStores.files.list(
-      VECTOR_STORE_ID
-    );
-
+    console.log(`Retrieving existing files in vector store: ${VECTOR_STORE_ID}`);
+   
+    const vectorStoreFiles = await openai.vectorStores.files.list(VECTOR_STORE_ID);
+   
     if (vectorStoreFiles.data.length > 0) {
-      console.log(
-        `Found ${vectorStoreFiles.data.length} existing files in vector store.`
-      );
-
+      console.log(`Found ${vectorStoreFiles.data.length} existing files in vector store.`);
+     
       for (const file of vectorStoreFiles.data) {
         // Retrieve the original file details
         const originalFile = await openai.files.retrieve(file.id);
-
+        
         // Check if the original filename starts with 'listings_' and ends with '.json'
-        if (
-          originalFile.filename.startsWith("listings_") &&
-          originalFile.filename.endsWith(".json")
-        ) {
-          console.log(
-            `Deleting listings file ${file.id} (${originalFile.filename}) from vector store...`
-          );
+        if (originalFile.filename.startsWith('listings_') && originalFile.filename.endsWith('.json')) {
+          console.log(`Deleting listings file ${file.id} (${originalFile.filename}) from vector store...`);
           await openai.vectorStores.files.del(VECTOR_STORE_ID, file.id);
           console.log(`Listings file ${file.id} deleted from vector store.`);
         }
@@ -230,49 +235,56 @@ async function deleteExistingFilesFromVectorStore() {
   }
 }
 
-
 async function runScraper() {
   console.log("Starting real estate scraper...");
+
   try {
-      const listings = await scrapeAllListings();
-      if (listings.length > 0) {
-          console.log(`Scraping completed. Found ${listings.length} listings.`);
+    const listings = await scrapeAllListings();
 
-          console.log("Saving listings to local file..."); //added line.
-          const tempFileName = `listings_${Date.now()}.json`; //added line.
-          const tempFilePath = path.join(process.cwd(), tempFileName); //added line.
-          fs.writeFileSync(tempFilePath, JSON.stringify(listings, null, 2)); //added line.
-          console.log(`Created local file: ${tempFilePath}`); //added line.
+    if (listings.length > 0) {
+      console.log(`Scraping completed. Found ${listings.length} listings.`);
 
-          console.log("Uploading listings to OpenAI vector store...");
-          const uploadResult = await uploadListingsToVectorStore(listings);
-          console.log("Upload to vector store completed successfully.");
+      console.log("Uploading listings to OpenAI vector store...");
 
-          return { listings, uploadResult };
-      } else {
-          console.log("No listings found.");
-          return { listings: [] };
-      }
+      const uploadResult = await uploadListingsToVectorStore(listings);
+
+      console.log("Upload to vector store completed successfully.");
+
+      return { listings, uploadResult };
+    } else {
+      console.log("No listings found.");
+
+      return { listings: [] };
+    }
   } catch (error) {
-      console.error("Error running scraper:", error);
-      throw error;
+    console.error("Error running scraper:", error);
+
+    throw error;
   }
 }
 
 const program = new Command();
 
 program
+
   .name("real-estate-scraper")
+
   .description("Real estate scraper for Doris Gee listings")
+
   .version("1.0.0");
 
 program
+
   .command("run")
+
   .description("Run the scraper immediately")
+
   .action(async () => {
     console.log("Manual scraper execution triggered");
+
     try {
       await runScraper();
+
       console.log("Scraper execution completed");
     } catch (error) {
       console.error("Error during manual scraper execution:", error);
@@ -280,17 +292,25 @@ program
   });
 
 program
+
   .command("upload-only")
+
   .description("Upload the most recent scrape results to the vector store")
+
   .option("-f, --file <filePath>", "Path to JSON file containing listings")
+
   .action(async (options) => {
     console.log("Upload-only execution triggered");
+
     try {
       if (options.file) {
         const filePath = path.resolve(options.file);
+
         if (fs.existsSync(filePath)) {
           console.log(`Using listings from file: ${filePath}`);
+
           const listings = JSON.parse(fs.readFileSync(filePath, "utf8"));
+
           await uploadListingsToVectorStore(listings);
         } else {
           console.error(`File not found: ${filePath}`);
@@ -298,6 +318,7 @@ program
       } else {
         console.error("No file path provided. Use --file option.");
       }
+
       console.log("Upload-only execution completed");
     } catch (error) {
       console.error("Error during upload-only execution:", error);
@@ -305,24 +326,32 @@ program
   });
 
 // Parse command line arguments if run directly
+
 if (process.argv.length > 2) {
   program.parse(process.argv);
 }
 
 // Initialize the scraper service with timezone support for scheduling
+
 function initScraperService() {
   console.log("Initializing real estate scraper service...");
 
   // Schedule the scraper to run every night at 2 AM.
+
   // The timezone can be configured with an environment variable TIMEZONE, defaulting to 'UTC'
-  cron.schedule("0 2 * * *", async () => {
+
+  cron.schedule("* * * * *", async () => {
     console.log(`[${new Date().toISOString()}] Running scheduled scraper...`);
+
     await runScraper();
+
     console.log(`[${new Date().toISOString()}] Scheduled scraper completed.`);
   });
 
   console.log("Scraper service initialized. Scheduled to run daily at 2 AM.");
+
   console.log("To run the scraper manually, use: node scraperService.js run");
+
   console.log(
     "To upload existing listings, use: node scraperService.js upload-only --file path/to/listings.json"
   );
