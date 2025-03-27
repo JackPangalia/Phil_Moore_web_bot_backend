@@ -340,7 +340,7 @@ function initScraperService() {
 
   // The timezone can be configured with an environment variable TIMEZONE, defaulting to 'UTC'
 
-  cron.schedule("* * * * *", async () => {
+  cron.schedule("0 2 * * *", async () => {
     console.log(`[${new Date().toISOString()}] Running scheduled scraper...`);
 
     await runScraper();

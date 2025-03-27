@@ -19,11 +19,15 @@ const corsOptions = {
     'http://localhost:5173'
   ],
   methods: ['GET', 'POST'],
-  allowedHeaders: ['Content-Type'],
+  allowedHeaders: ['Content-Type', 'Origin'],
   credentials: true,
 };
 
-const io = new Server(server, { cors: corsOptions });
+const io = new Server(server, { 
+  cors: corsOptions,
+  transports: ['websocket', 'polling'],
+  allowEIO3: true
+});
 
 app.use(cors(corsOptions));
 app.use(express.json());
