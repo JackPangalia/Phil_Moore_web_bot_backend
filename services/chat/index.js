@@ -1,8 +1,9 @@
-// services/chat/index.js
+// services/chat/index.js - MODIFIED VERSION
 import { v4 as uuidv4 } from "uuid";
 import SessionManager from "./SessionManager.js";
 import AssistantManager from "./AssistantManager.js";
-import SuggestionGenerator from "./SuggestionGenerator.js";
+// We no longer need the SuggestionGenerator
+// import SuggestionGenerator from "./SuggestionGenerator.js";
 
 /**
  * Manages chat sessions, handling initialization, message processing, and cleanup.
@@ -35,10 +36,7 @@ class ChatService {
      */
     this.assistantManager = new AssistantManager(openai);
 
-    /**
-     * @type {SuggestionGenerator} suggestionGenerator - Generates quick reply suggestions.
-     */
-    this.suggestionGenerator = new SuggestionGenerator(openai);
+    // We've removed the SuggestionGenerator since suggestions are now handled on the client side
 
     // Set up periodic cleanup for expired sessions every 15 minutes
     setInterval(() => this.cleanupExpiredSessions(), 15 * 60 * 1000);
@@ -185,16 +183,8 @@ class ChatService {
 
       stream.on("end", async () => {
         socket.emit("responseComplete");
-        try {
-          const suggestions = await this.suggestionGenerator.generate(
-            prompt,
-            fullResponse
-          );
-          socket.emit("suggestions", { suggestions });
-        } catch (suggestionError) {
-          console.error("Error generating suggestions:", suggestionError);
-          // Non-critical error, don't notify user
-        }
+        // We no longer generate suggestions on the server side
+        // Client will handle cycling suggestions
 
         // Schedule cleanup but don't immediately delete
         this.sessionManager.scheduleCleanup(sessionId);
